@@ -235,13 +235,17 @@ namespace call_func_proc
 	//
 	ExEdit::Filter* find_inheritance_filter(ExEdit::Object* object)
 	{
+		// 中間点の先頭オブジェクトを取得します．
+		auto* leader = object;
+		if (object->index_midpt_leader >= 0) leader = exin.get_object(object->index_midpt_leader);
+
 		for (int32_t i = 0; i < ExEdit::Object::MAX_FILTER; i++)
 		{
 			auto filter = exin.get_filter(object, i);
 			if (!filter) return nullptr;
 			if (!filter->name) continue;
 			if (strcmp(filter->name, plugin_name)) continue;
-			if (!(object->filter_status[i] & ExEdit::Object::FilterStatus::Active)) continue;
+			if (!(leader->filter_status[i] & ExEdit::Object::FilterStatus::Active)) continue;
 
 			return filter;
 		}
