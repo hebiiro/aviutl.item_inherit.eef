@@ -413,9 +413,14 @@ namespace my
 		// 戻り値
 		// 拡張データへのオフセットです。
 		//
-		static DWORD get_exdata_offset(ExEdit::Object* object, int32_t filter_index)
+		DWORD get_exdata_offset(ExEdit::Object* object, int32_t filter_index)
 		{
-			return object->exdata_offset + object->filter_param[filter_index].exdata_offset;
+			// 中間点の先頭オブジェクトを取得します．
+			auto* leader = object;
+			if (object->index_midpt_leader >= 0)
+				leader = *address.variable.object_table + object->index_midpt_leader;
+
+			return leader->exdata_offset + leader->filter_param[filter_index].exdata_offset;
 		}
 
 		//
