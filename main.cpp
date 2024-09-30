@@ -73,7 +73,7 @@ namespace inheritance
 		int32_t layer;
 		int32_t frame_layer;
 		BOOL same_group;
-		BOOL no_inherit_head_filter;
+		BOOL no_inherit_draw_filter;
 
 		int32_t layer_range;
 	};
@@ -105,13 +105,13 @@ namespace inheritance
 		auto layer = filter->track[0];
 		auto frame_layer = filter->track[1] - 1;
 		auto same_group = filter->check[0];
-		auto no_inherit_head_filter = filter->check[1];
+		auto no_inherit_draw_filter = filter->check[1];
 
 		auto layer_range = 100;
 		if (layer) layer_range = object->layer_set + layer;
 
 		collection.emplace_back(std::make_shared<Node>(
-			object, layer, frame_layer, same_group, no_inherit_head_filter, layer_range));
+			object, layer, frame_layer, same_group, no_inherit_draw_filter, layer_range));
 	}
 
 	//
@@ -217,7 +217,7 @@ namespace call_func_proc
 	//
 	// 指定されたオブジェクトが持つ最後のフィルタを返します。
 	//
-	int32_t find_last_filter_index(ExEdit::Object* object)
+	int32_t find_draw_filter_index(ExEdit::Object* object)
 	{
 		for (int32_t i = 0; i < ExEdit::Object::MAX_FILTER; i++)
 		{
@@ -384,7 +384,7 @@ namespace call_func_proc
 				//
 				void read(ExEdit::Object* object)
 				{
-					acc = std::make_unique<FilterAcc>(object, find_last_filter_index(object));
+					acc = std::make_unique<FilterAcc>(object, find_draw_filter_index(object));
 
 					if (strcmp(acc->filter->name, "標準描画") == 0)
 					{
@@ -444,7 +444,7 @@ namespace call_func_proc
 				{
 					if (!acc) return;
 
-					auto acc = std::make_unique<FilterAcc>(object, find_last_filter_index(object));
+					auto acc = std::make_unique<FilterAcc>(object, find_draw_filter_index(object));
 
 					if (strcmp(acc->filter->name, "標準描画") == 0)
 					{
@@ -492,12 +492,12 @@ namespace call_func_proc
 						acc->check(1) = check[1];
 					}
 				}
-			} last_filter;
+			} draw_filter;
 
 			//
 			// コンストラクタです。
 			//
-			ObjectSettings(ExEdit::Object* object, BOOL no_inherit_head_filter, ExEdit::Object* frame_object = nullptr)
+			ObjectSettings(ExEdit::Object* object, BOOL no_inherit_draw_filter, ExEdit::Object* frame_object = nullptr)
 			{
 				text = get_text(object);
 				frame_begin = object->frame_begin;
@@ -506,8 +506,8 @@ namespace call_func_proc
 				layer_set = object->layer_set;
 				scene_set = object->scene_set;
 
-				if (no_inherit_head_filter)
-					last_filter.read(object);
+				if (no_inherit_draw_filter)
+					draw_filter.read(object);
 
 				if (frame_object)
 				{
@@ -528,7 +528,7 @@ namespace call_func_proc
 				object->layer_set = layer_set;
 				object->scene_set = scene_set;
 
-				last_filter.write(object);
+				draw_filter.write(object);
 			}
 		};
 
@@ -546,13 +546,13 @@ namespace call_func_proc
 		{
 			// あとで元に戻せるように
 			// 継承元オブジェクトの設定値を保存しておきます。
-			inheritance_settings = std::make_unique<ObjectSettings>(node->object, node->no_inherit_head_filter);
+			inheritance_settings = std::make_unique<ObjectSettings>(node->object, node->no_inherit_draw_filter);
 
 			auto frame_object = inheritance::find(node->frame_layer);
 
 			// 処理中オブジェクトの設定値を取得します。
 			auto processing_settings = std::make_unique<ObjectSettings>(
-				processing_object, node->no_inherit_head_filter, frame_object);
+				processing_object, node->no_inherit_draw_filter, frame_object);
 
 			// 継承元オブジェクトの設定値を書き換えます。
 			processing_settings->apply(node->object);
