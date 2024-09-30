@@ -236,12 +236,26 @@ namespace my
 		ExEdit::Object* get_sorted_object(int32_t object_index) { return address.variable.sorted_object_table[object_index]; }
 		ExEdit::Filter* get_filter(int32_t filter_id) { return address.variable.filter_table[filter_id]; }
 
+		//
+		// 指定されたオブジェクトの指定されたインデックスにあるフィルタを返します。
+		//
 		ExEdit::Filter* get_filter(ExEdit::Object* object, int32_t filter_index)
 		{
 			if (!object) return 0;
 			int32_t id = object->filter_param[filter_index].id;
 			if (id < 0) return 0;
 			return get_filter(id);
+		}
+
+		//
+		// 指定されたオブジェクトの中間点リーダーを返します。
+		//
+		ExEdit::Object* get_midpt_leader(ExEdit::Object* object)
+		{
+			if (object->index_midpt_leader >= 0)
+				return get_object(object->index_midpt_leader);
+			else
+				return object;
 		}
 
 		int32_t get_next_object_index(int32_t object_index) { return address.variable.next_object_table[object_index]; }

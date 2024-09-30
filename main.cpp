@@ -235,13 +235,15 @@ namespace call_func_proc
 	//
 	ExEdit::Filter* find_inheritance_filter(ExEdit::Object* object)
 	{
+		auto leader = exin.get_midpt_leader(object);
+
 		for (int32_t i = 0; i < ExEdit::Object::MAX_FILTER; i++)
 		{
 			auto filter = exin.get_filter(object, i);
 			if (!filter) return nullptr;
 			if (!filter->name) continue;
 			if (strcmp(filter->name, plugin_name)) continue;
-			if (!(object->filter_status[i] & ExEdit::Object::FilterStatus::Active)) continue;
+			if (!(leader->filter_status[i] & ExEdit::Object::FilterStatus::Active)) continue;
 
 			return filter;
 		}
@@ -277,20 +279,22 @@ namespace call_func_proc
 	}
 
 	//
-	// テキストオブジェクトのテキストを返します。
+	// テキストオブジェクト(のリーダー)のテキストを返します。
 	//
 	std::vector<wchar_t> get_text(ExEdit::Object* object)
 	{
-		auto exdata = get_text_exdata(object);
+		auto leader = exin.get_midpt_leader(object);
+		auto exdata = get_text_exdata(leader);
 		return { std::begin(exdata->text), std::end(exdata->text) };
 	}
 
 	//
-	// テキストオブジェクトのテキストを変更します。
+	// テキストオブジェクト(のリーダー)のテキストを変更します。
 	//
 	void set_text(ExEdit::Object* object, const std::vector<wchar_t>& text)
 	{
-		auto exdata = get_text_exdata(object);
+		auto leader = exin.get_midpt_leader(object);
+		auto exdata = get_text_exdata(leader);
 		std::copy(std::begin(text), std::end(text), exdata->text);
 	}
 
