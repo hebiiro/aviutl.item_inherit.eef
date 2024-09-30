@@ -304,6 +304,13 @@ namespace call_func_proc
 	//
 	struct Disguiser
 	{
+		struct Track {
+			int32_t value_left;
+			int32_t value_right;
+			ExEdit::Object::TrackMode mode;
+			int32_t param;
+		};
+
 		//
 		// この構造体はフィルタ設定値へのアクセサです。
 		//
@@ -329,27 +336,45 @@ namespace call_func_proc
 			bool is_valid() const { return !!filter; }
 
 			//
-			// 左トラックの参照を返します。
+			// トラックの値を取得します。
 			//
-			int32_t& track_left(int32_t index)
+			void get_track(int32_t index, Track& track)
 			{
-				return object->track_value_left[object->filter_param[filter_index].track_begin + index];
+				int32_t track_index = object->filter_param[filter_index].track_begin + index;
+				track.value_left = object->track_value_left[track_index];
+				track.value_right = object->track_value_right[track_index];
+				track.mode = object->track_mode[track_index];
+				track.param = object->track_param[track_index];
 			}
 
 			//
-			// 右トラックの参照を返します。
+			// トラックの値を設定します。
 			//
-			int32_t& track_right(int32_t index)
+			void set_track(int32_t index, const Track& track)
 			{
-				return object->track_value_right[object->filter_param[filter_index].track_begin + index];
+				int32_t track_index = object->filter_param[filter_index].track_begin + index;
+				object->track_value_left[track_index] = track.value_left;
+				object->track_value_right[track_index] = track.value_right;
+				object->track_mode[track_index] = track.mode;
+				object->track_param[track_index] = track.param;
 			}
 
 			//
-			// チェックの参照を返します。
+			// チェックの値を取得します。
 			//
-			int32_t& check(int32_t index)
+			void get_check(int32_t index, int32_t& check)
 			{
-				return object->check_value[object->filter_param[filter_index].check_begin + index];
+				int32_t check_index = object->filter_param[filter_index].check_begin + index;
+				check = object->check_value[check_index];
+			}
+
+			//
+			// チェックの値を設定します。
+			//
+			void set_check(int32_t index, int32_t check)
+			{
+				int32_t check_index = object->filter_param[filter_index].check_begin + index;
+				object->check_value[check_index] = check;
 			}
 		};
 
@@ -369,14 +394,12 @@ namespace call_func_proc
 			// 拡張描画の場合 track_n = 12, check_n = 2, pos[3], scale, alpha, aspect, angle[3], origin[3];
 			struct LastFilter {
 				std::unique_ptr<FilterAcc> acc;
-				struct Track {
-					int32_t pos[3] = {};
-					int32_t scale = {};
-					int32_t alpha = {};
-					int32_t aspect = {};
-					int32_t angle[3] = {};
-					int32_t origin[3] = {};
-				} track_left, track_right;
+				Track pos[3] = {};
+				Track scale = {};
+				Track alpha = {};
+				Track aspect = {};
+				Track angle[3] = {};
+				Track origin[3] = {};
 				int32_t check[2] = {};
 
 				//
@@ -388,48 +411,30 @@ namespace call_func_proc
 
 					if (strcmp(acc->filter->name, "標準描画") == 0)
 					{
-						track_left.pos[0] = acc->track_left(0);
-						track_left.pos[1] = acc->track_left(1);
-						track_left.pos[2] = acc->track_left(2);
-						track_left.scale = acc->track_left(3);
-						track_left.alpha = acc->track_left(4);
-						track_left.angle[2] = acc->track_left(5);
-						track_right.pos[0] = acc->track_right(0);
-						track_right.pos[1] = acc->track_right(1);
-						track_right.pos[2] = acc->track_right(2);
-						track_right.scale = acc->track_right(3);
-						track_right.alpha = acc->track_right(4);
-						track_right.angle[2] = acc->track_right(5);
-						check[0] = acc->check(0);
+						acc->get_track(0, pos[0]);
+						acc->get_track(1, pos[1]);
+						acc->get_track(2, pos[2]);
+						acc->get_track(3, scale);
+						acc->get_track(4, alpha);
+						acc->get_track(5, angle[2]);
+						acc->get_check(0, check[0]);
 					}
 					else if (strcmp(acc->filter->name, "拡張描画") == 0)
 					{
-						track_left.pos[0] = acc->track_left(0);
-						track_left.pos[1] = acc->track_left(1);
-						track_left.pos[2] = acc->track_left(2);
-						track_left.scale = acc->track_left(3);
-						track_left.alpha = acc->track_left(4);
-						track_left.aspect = acc->track_left(5);
-						track_left.angle[0] = acc->track_left(6);
-						track_left.angle[1] = acc->track_left(7);
-						track_left.angle[2] = acc->track_left(8);
-						track_left.origin[0] = acc->track_left(9);
-						track_left.origin[1] = acc->track_left(10);
-						track_left.origin[2] = acc->track_left(11);
-						track_right.pos[0] = acc->track_right(0);
-						track_right.pos[1] = acc->track_right(1);
-						track_right.pos[2] = acc->track_right(2);
-						track_right.scale = acc->track_right(3);
-						track_right.alpha = acc->track_right(4);
-						track_right.aspect = acc->track_right(5);
-						track_right.angle[0] = acc->track_right(6);
-						track_right.angle[1] = acc->track_right(7);
-						track_right.angle[2] = acc->track_right(8);
-						track_right.origin[0] = acc->track_right(9);
-						track_right.origin[1] = acc->track_right(10);
-						track_right.origin[2] = acc->track_right(11);
-						check[0] = acc->check(0);
-						check[1] = acc->check(1);
+						acc->get_track(0, pos[0]);
+						acc->get_track(1, pos[1]);
+						acc->get_track(2, pos[2]);
+						acc->get_track(3, scale);
+						acc->get_track(4, alpha);
+						acc->get_track(5, aspect);
+						acc->get_track(6, angle[0]);
+						acc->get_track(7, angle[1]);
+						acc->get_track(8, angle[2]);
+						acc->get_track(9, origin[0]);
+						acc->get_track(10, origin[1]);
+						acc->get_track(11, origin[2]);
+						acc->get_check(0, check[0]);
+						acc->get_check(1, check[1]);
 					}
 					else
 					{
@@ -448,48 +453,30 @@ namespace call_func_proc
 
 					if (strcmp(acc->filter->name, "標準描画") == 0)
 					{
-						acc->track_left(0) = track_left.pos[0];
-						acc->track_left(1) = track_left.pos[1];
-						acc->track_left(2) = track_left.pos[2];
-						acc->track_left(3) = track_left.scale;
-						acc->track_left(4) = track_left.alpha;
-						acc->track_left(5) = track_left.angle[2];
-						acc->track_right(0) = track_right.pos[0];
-						acc->track_right(1) = track_right.pos[1];
-						acc->track_right(2) = track_right.pos[2];
-						acc->track_right(3) = track_right.scale;
-						acc->track_right(4) = track_right.alpha;
-						acc->track_right(5) = track_right.angle[2];
-						acc->check(0) = check[0];
+						acc->set_track(0, pos[0]);
+						acc->set_track(1, pos[1]);
+						acc->set_track(2, pos[2]);
+						acc->set_track(3, scale);
+						acc->set_track(4, alpha);
+						acc->set_track(5, angle[2]);
+						acc->set_check(0, check[0]);
 					}
 					else if (strcmp(acc->filter->name, "拡張描画") == 0)
 					{
-						acc->track_left(0) = track_left.pos[0];
-						acc->track_left(1) = track_left.pos[1];
-						acc->track_left(2) = track_left.pos[2];
-						acc->track_left(3) = track_left.scale;
-						acc->track_left(4) = track_left.alpha;
-						acc->track_left(5) = track_left.aspect;
-						acc->track_left(6) = track_left.angle[0];
-						acc->track_left(7) = track_left.angle[1];
-						acc->track_left(8) = track_left.angle[2];
-						acc->track_left(9) = track_left.origin[0];
-						acc->track_left(10) = track_left.origin[1];
-						acc->track_left(11) = track_left.origin[2];
-						acc->track_right(0) = track_right.pos[0];
-						acc->track_right(1) = track_right.pos[1];
-						acc->track_right(2) = track_right.pos[2];
-						acc->track_right(3) = track_right.scale;
-						acc->track_right(4) = track_right.alpha;
-						acc->track_right(5) = track_right.aspect;
-						acc->track_right(6) = track_right.angle[0];
-						acc->track_right(7) = track_right.angle[1];
-						acc->track_right(8) = track_right.angle[2];
-						acc->track_right(9) = track_right.origin[0];
-						acc->track_right(10) = track_right.origin[1];
-						acc->track_right(11) = track_right.origin[2];
-						acc->check(0) = check[0];
-						acc->check(1) = check[1];
+						acc->set_track(0, pos[0]);
+						acc->set_track(1, pos[1]);
+						acc->set_track(2, pos[2]);
+						acc->set_track(3, scale);
+						acc->set_track(4, alpha);
+						acc->set_track(5, aspect);
+						acc->set_track(6, angle[0]);
+						acc->set_track(7, angle[1]);
+						acc->set_track(8, angle[2]);
+						acc->set_track(9, origin[0]);
+						acc->set_track(10, origin[1]);
+						acc->set_track(11, origin[2]);
+						acc->set_check(0, check[0]);
+						acc->set_check(1, check[1]);
 					}
 				}
 			} draw_filter;
@@ -548,6 +535,7 @@ namespace call_func_proc
 			// 継承元オブジェクトの設定値を保存しておきます。
 			inheritance_settings = std::make_unique<ObjectSettings>(node->object, node->no_inherit_draw_filter);
 
+			// フレーム位置を保有するオブジェクトを取得します。
 			auto frame_object = inheritance::find(node->frame_layer);
 
 			// 処理中オブジェクトの設定値を取得します。
@@ -575,8 +563,6 @@ namespace call_func_proc
 	void (CDECL* orig_proc)(ExEdit::Object* processing_object, ExEdit::FilterProcInfo* efpip, uint32_t flags) = nullptr;
 	void CDECL hook_proc(ExEdit::Object* processing_object, ExEdit::FilterProcInfo* efpip, uint32_t flags)
 	{
-		auto filter = exin.get_filter(processing_object, 0);
-
 		// フラグが立っている場合は
 		if (flags)
 		{
