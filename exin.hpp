@@ -11,7 +11,7 @@ namespace my
 	struct SelectionVisual
 	{
 		int32_t object_index; // -30
-		uint32_t u9; // -2C
+		int32_t filter_index; // -2C
 		uint32_t u8; // -28
 		uint32_t u7; // -24
 		uint32_t u6; // -20
@@ -20,10 +20,10 @@ namespace my
 		int32_t y; // -14
 		int32_t w; // -10
 		int32_t h; // -0C
-		uint16_t u4; // -08
-		uint16_t u3; // -06
-		uint16_t u2; // -04
-		uint16_t u1; // -02
+		int16_t u4; // -08
+		int16_t u3; // -06
+		int16_t u2; // -04
+		int16_t u1; // -02
 		uint32_t flags; // 0x04ビットが選択アイテム
 	};
 
@@ -198,32 +198,20 @@ namespace my
 		//
 		// 拡張編集のベースアドレスを返します。
 		//
-		// 戻り値
-		// 拡張編集のベースアドレスです。
-		//
 		addr_t get_exedit() { return exedit; }
 
 		//
 		// AviUtlウィンドウを返します。
-		//
-		// 戻り値
-		// AviUtlウィンドウのウィンドウハンドルです。
 		//
 		HWND get_aviutl_window() { return *address.variable.aviutl_window; }
 
 		//
 		// 拡張編集ウィンドウを返します。
 		//
-		// 戻り値
-		// 拡張編集ウィンドウのウィンドウハンドルです。
-		//
 		HWND get_exedit_window() { return *address.variable.exedit_window; }
 
 		//
 		// 設定ダイアログを返します。
-		//
-		// 戻り値
-		// 設定ダイアログのウィンドウハンドルです。
 		//
 		HWND get_setting_dialog() { return *address.variable.setting_dialog; }
 
@@ -279,45 +267,21 @@ namespace my
 		//
 		// フォントコンボボックスを返します。
 		//
-		// 戻り値
-		// フォントコンボボックスのウィンドウハンドルです。
-		//
 		HWND get_font_combobox() { return *address.variable.font_combobox; }
 
 		//
 		// 拡張編集のBPMを返します。
 		// ※ユーザーが指定した数値の10,000倍になっています。
 		//
-		// 戻り値
-		// 拡張編集のBPMです。
-		//
 		int32_t get_bpm() { return *address.variable.bpm; }
 
 		//
 		// 拡張編集の「色の選択」ダイアログを表示します。
 		//
-		// u1
-		// 不明です。
-		//
-		// color [in, out]
-		// 取得した色を格納するポインタです。
-		//
-		// u3
-		// 不明です。
-		//
-		// 戻り値
-		// IDOKやIDCANCELだと思われます。
-		//
 		int32_t show_color_dialog(DWORD u1, COLORREF* color, DWORD u3) { return address.function.show_color_dialog(u1, color, u3); }
 
 		//
 		// フレーム番号を拡張編集ウィンドウ内のX座標(ピクセル単位)に変換します。
-		//
-		// frame
-		// フレーム番号です。
-		//
-		// 戻り値
-		// X座標です。
 		//
 		int64_t frame_to_x(int32_t frame) { return address.function.frame_to_x(frame); }
 
@@ -328,12 +292,6 @@ namespace my
 
 		//
 		// 指定されたアイテムを現在のアンドゥに追加します。
-		//
-		// object_index
-		// アンドゥの対象となるアイテムです。
-		//
-		// flags
-		// 不明です。
 		//
 		void create_undo(int32_t object_index, uint32_t flags) { address.function.create_undo(object_index, flags); }
 
@@ -358,12 +316,6 @@ namespace my
 		//
 		// 拡張編集ウィンドウを再描画します。
 		//
-		// rc [in, opt]
-		// 再描画する領域です。
-		//
-		// 戻り値
-		// 成功した場合はTRUEです。
-		//
 		BOOL invalidate(LPCRECT rc = nullptr)
 		{
 			return ::InvalidateRect(get_exedit_window(), rc, FALSE);
@@ -371,15 +323,6 @@ namespace my
 
 		//
 		// 指定されたアイテムの指定されたフィルタの拡張データを返します。
-		//
-		// object [in]
-		// 拡張編集のアイテムです。
-		//
-		// filter_index [in]
-		// アイテム内のフィルタのインデックスです。
-		//
-		// 戻り値
-		// 拡張データです。
 		//
 		uint8_t* get_exdata(ExEdit::Object* object, int32_t filter_index)
 		{
@@ -389,18 +332,28 @@ namespace my
 		}
 
 		//
+		// 指定されたアイテムのインデックスを返します。
+		//
+		int32_t get_object_index(ExEdit::Object* object)
+		{
+			return object - *address.variable.object_table;
+		}
+
+		//
+		// オブジェクトフィルタインデックスを作成して返します。
+		//
+		ExEdit::ObjectFilterIndex get_object_filter_index(ExEdit::Object* object, int32_t filter_index)
+		{
+			ExEdit::ObjectFilterIndex object_filter_index = {};
+			ExEdit::object(object_filter_index) = get_object_index(object) + 1;
+			ExEdit::filter(object_filter_index) = filter_index;
+			return object_filter_index;
+		}
+
+		//
 		// 指定されたフィルタIDに対応するフィルタのインデックスを返します。
 		//
-		// object [in]
-		// 拡張編集のアイテムです。
-		//
-		// filter_id [in]
-		// アイテム内のフィルタのIDです。
-		//
-		// 戻り値
-		// フィルタのインデックスです。
-		//
-		static int32_t get_filter_index(ExEdit::Object* object, int32_t filter_id)
+		inline static int32_t get_filter_index(ExEdit::Object* object, int32_t filter_id)
 		{
 			if (!object) return -1;
 
@@ -418,16 +371,7 @@ namespace my
 		//
 		// 指定されたアイテムの指定されたフィルタの拡張データへのオフセットを返します。
 		//
-		// object [in]
-		// 拡張編集のアイテムです。
-		//
-		// filter_index [in]
-		// アイテム内のフィルタのインデックスです。
-		//
-		// 戻り値
-		// 拡張データへのオフセットです。
-		//
-		static DWORD get_exdata_offset(ExEdit::Object* object, int32_t filter_index)
+		inline static DWORD get_exdata_offset(ExEdit::Object* object, int32_t filter_index)
 		{
 			return object->exdata_offset + object->filter_param[filter_index].exdata_offset;
 		}
@@ -435,16 +379,7 @@ namespace my
 		//
 		// 指定されたフィルタが移動可能な場合はTRUEを返します。
 		//
-		// object [in]
-		// 拡張編集のアイテムです。
-		//
-		// filter_index [in]
-		// アイテム内のフィルタのインデックスです。
-		//
-		// 戻り値
-		// BOOLです。
-		//
-		static BOOL is_moveable(ExEdit::Object* object, int32_t filter_index)
+		inline static BOOL is_moveable(ExEdit::Object* object, int32_t filter_index)
 		{
 			int32_t id = object->filter_param[filter_index].id;
 			switch (id)
@@ -478,13 +413,7 @@ namespace my
 		//
 		// 指定されたアイテムが保有する移動可能なフィルタの数を返します。
 		//
-		// object [in]
-		// 拡張編集のアイテムです。
-		//
-		// 戻り値
-		// 移動可能なフィルタの数です。
-		//
-		static int32_t get_moveable_filter_count(ExEdit::Object* object)
+		inline static int32_t get_moveable_filter_count(ExEdit::Object* object)
 		{
 			for (int32_t i = 0; i < ExEdit::Object::MAX_FILTER; i++)
 			{

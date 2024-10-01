@@ -174,6 +174,40 @@ namespace inheritance
 }
 
 //
+// 継承先を管理します。
+//
+namespace heir
+{
+	//
+	// 継承先のオブジェクトフィルタインデックスです。
+	//
+	ExEdit::ObjectFilterIndex processing = {};
+
+	//
+	// 継承元のオブジェクトフィルタインデックスです。
+	//
+	ExEdit::ObjectFilterIndex fake = {};
+
+	//
+	// 継承先をリセットします。
+	//
+	void reset()
+	{
+		processing = {};
+		fake = {};
+	}
+
+	//
+	// 継承先をセットします。
+	//
+	void set(ExEdit::Object* processing_object, int32_t processing_filter_index, int32_t fake_filter_index)
+	{
+		processing = exin.get_object_filter_index(processing_object, processing_filter_index);
+		fake = exin.get_object_filter_index(processing_object, fake_filter_index);
+	}
+}
+
+//
 // func_update()を呼び出している関数をフックします。
 // 拡張編集を解析するためのコードです。実際には使用されていません。
 //
@@ -215,7 +249,7 @@ namespace call_func_update
 namespace call_func_proc
 {
 	//
-	// 指定されたオブジェクトが持つ最後のフィルタを返します。
+	// 指定されたオブジェクトが持つ描画フィルタを返します。
 	//
 	int32_t find_draw_filter_index(ExEdit::Object* object)
 	{
@@ -224,7 +258,7 @@ namespace call_func_proc
 			auto back_index = ExEdit::Object::MAX_FILTER - i - 1;
 
 			if (object->filter_param[back_index].is_valid())
-				return back_index;
+				return back_index; // 最後尾のフィルタのインデックスを返します。
 		}
 
 		return ExEdit::Object::FilterParam::None;
@@ -519,9 +553,149 @@ namespace call_func_proc
 			}
 		};
 
+		//
+		// 偽装に必要なオブジェクトの交換パーツです。
+		//
+		struct ReplacementParts
+		{
+			ExEdit::Object all;
+			std::vector<wchar_t> text;
+
+			// 標準描画の場合 track_n = 6, check_n = 1, pos[3], scale, alpha, angle;
+			// 拡張描画の場合 track_n = 12, check_n = 2, pos[3], scale, alpha, aspect, angle[3], origin[3];
+			struct DrawFilter {
+				std::unique_ptr<FilterAcc> acc;
+				Track pos[3] = {};
+				Track scale = {};
+				Track alpha = {};
+				Track aspect = {};
+				Track angle[3] = {};
+				Track origin[3] = {};
+				int32_t check[2] = {};
+				ExEdit::ObjectFilterIndex processing = {};
+
+				//
+				// 指定されたオブジェクトから値を読み込みます。
+				//
+				void read(ExEdit::Object* object)
+				{
+					acc = std::make_unique<FilterAcc>(object, find_draw_filter_index(object));
+
+					if (strcmp(acc->filter->name, "標準描画") == 0)
+					{
+						acc->get_track(0, pos[0]);
+						acc->get_track(1, pos[1]);
+						acc->get_track(2, pos[2]);
+						acc->get_track(3, scale);
+						acc->get_track(4, alpha);
+						acc->get_track(5, angle[2]);
+						acc->get_check(0, check[0]);
+						processing = acc->filter->processing;
+					}
+					else if (strcmp(acc->filter->name, "拡張描画") == 0)
+					{
+						acc->get_track(0, pos[0]);
+						acc->get_track(1, pos[1]);
+						acc->get_track(2, pos[2]);
+						acc->get_track(3, scale);
+						acc->get_track(4, alpha);
+						acc->get_track(5, aspect);
+						acc->get_track(6, angle[0]);
+						acc->get_track(7, angle[1]);
+						acc->get_track(8, angle[2]);
+						acc->get_track(9, origin[0]);
+						acc->get_track(10, origin[1]);
+						acc->get_track(11, origin[2]);
+						acc->get_check(0, check[0]);
+						acc->get_check(1, check[1]);
+						processing = acc->filter->processing;
+					}
+					else
+					{
+						acc.reset();
+					}
+				}
+
+				//
+				// 指定されたオブジェクトに値を書き込みます。
+				//
+				void write(ExEdit::Object* object)
+				{
+					if (!acc) return;
+
+					auto acc = std::make_unique<FilterAcc>(object, find_draw_filter_index(object));
+
+					if (strcmp(acc->filter->name, "標準描画") == 0)
+					{
+						acc->set_track(0, pos[0]);
+						acc->set_track(1, pos[1]);
+						acc->set_track(2, pos[2]);
+						acc->set_track(3, scale);
+						acc->set_track(4, alpha);
+						acc->set_track(5, angle[2]);
+						acc->set_check(0, check[0]);
+					}
+					else if (strcmp(acc->filter->name, "拡張描画") == 0)
+					{
+						acc->set_track(0, pos[0]);
+						acc->set_track(1, pos[1]);
+						acc->set_track(2, pos[2]);
+						acc->set_track(3, scale);
+						acc->set_track(4, alpha);
+						acc->set_track(5, aspect);
+						acc->set_track(6, angle[0]);
+						acc->set_track(7, angle[1]);
+						acc->set_track(8, angle[2]);
+						acc->set_track(9, origin[0]);
+						acc->set_track(10, origin[1]);
+						acc->set_track(11, origin[2]);
+						acc->set_check(0, check[0]);
+						acc->set_check(1, check[1]);
+					}
+				}
+			} draw_filter;
+
+			//
+			// コンストラクタです。
+			//
+			ReplacementParts(ExEdit::Object* object, BOOL no_inherit_draw_filter)
+				: all(*object)
+				, text(get_text(object))
+			{
+				if (no_inherit_draw_filter)
+					draw_filter.read(object);
+			}
+
+			//
+			// 指定されたオブジェクトに交換パーツを適用します。
+			//
+			void apply(ExEdit::Object* object, ExEdit::Object* frame_object)
+			{
+				set_text(object, text);
+				object->layer_disp = all.layer_disp;
+				object->frame_begin = all.frame_begin;
+				object->frame_end = all.frame_end;
+				object->index_midpt_leader = all.index_midpt_leader;
+				object->group_belong = all.group_belong;
+				object->layer_set = all.layer_set;
+				object->scene_set = all.scene_set;
+
+				if (frame_object)
+				{
+					object->frame_begin = frame_object->frame_begin;
+					object->frame_end = frame_object->frame_end;
+				}
+
+				draw_filter.write(object);
+			}
+		};
+
 		ExEdit::Object* processing_object = nullptr;
 		std::shared_ptr<inheritance::Node> node;
-		std::unique_ptr<ObjectSettings> inheritance_settings;
+		std::unique_ptr<ReplacementParts> processing_parts;
+		std::unique_ptr<ReplacementParts> inheritance_parts;
+		ExEdit::Object* frame_object = nullptr;
+		ExEdit::Object* target_object = nullptr;
 
 		//
 		// コンストラクタです。
@@ -531,19 +705,32 @@ namespace call_func_proc
 			: processing_object(processing_object)
 			, node(node)
 		{
-			// あとで元に戻せるように
-			// 継承元オブジェクトの設定値を保存しておきます。
-			inheritance_settings = std::make_unique<ObjectSettings>(node->object, node->no_inherit_draw_filter);
+			// あとで元に戻せるように交換パーツを取得しておきます。
+			processing_parts = std::make_unique<ReplacementParts>(processing_object, node->no_inherit_draw_filter);
+			inheritance_parts = std::make_unique<ReplacementParts>(node->object, node->no_inherit_draw_filter);
 
 			// フレーム位置を保有するオブジェクトを取得します。
 			auto frame_object = inheritance::find(node->frame_layer);
 
-			// 処理中オブジェクトの設定値を取得します。
-			auto processing_settings = std::make_unique<ObjectSettings>(
-				processing_object, node->no_inherit_draw_filter, frame_object);
+			// 描画フィルタを継承しない場合は
+			if (node->no_inherit_draw_filter)
+			{
+				// 処理中オブジェクトを継承元オブジェクトに偽装します。
+				*processing_object = inheritance_parts->all;
+				processing_parts->apply(processing_object, frame_object);
+				target_object = processing_object;
 
-			// 継承元オブジェクトの設定値を書き換えます。
-			processing_settings->apply(node->object);
+				// 継承先をセットします。
+				heir::set(processing_object,
+					processing_parts->draw_filter.acc->filter_index,
+					inheritance_parts->draw_filter.acc->filter_index);
+			}
+			else
+			{
+				// 継承元オブジェクトを処理中オブジェクトに偽装します。
+				processing_parts->apply(node->object, frame_object);
+				target_object = node->object;
+			}
 		}
 
 		//
@@ -552,8 +739,21 @@ namespace call_func_proc
 		//
 		~Disguiser()
 		{
-			// 継承元オブジェクトの設定を元に戻します。
-			inheritance_settings->apply(node->object);
+			// 継承先をリセットします。
+			heir::reset();
+
+			// 描画フィルタを継承しない場合は
+			if (node->no_inherit_draw_filter)
+			{
+				// 処理中オブジェクトの交換パーツを元に戻します。
+				inheritance_parts->apply(processing_object, nullptr);
+				*processing_object = processing_parts->all;
+			}
+			else
+			{
+				// 継承元オブジェクトの交換パーツを元に戻します。
+				inheritance_parts->apply(node->object, nullptr);
+			}
 		}
 	};
 
@@ -569,6 +769,9 @@ namespace call_func_proc
 			// 個別オブジェクトなどなのでデフォルト処理を実行します。
 			return orig_proc(processing_object, efpip, flags);
 		}
+
+		// 継承先をリセットします。
+		heir::reset();
 
 		// このレイヤーとオブジェクトを関連付けます。
 		inheritance::add(processing_object->layer_set, processing_object);
@@ -593,7 +796,7 @@ namespace call_func_proc
 				Disguiser disguiser(processing_object, node);
 
 				// 偽装したオブジェクトを拡張編集に渡して処理させます。
-				return orig_proc(node->object, efpip, flags);
+				return orig_proc(disguiser.target_object, efpip, flags);
 			}
 		}
 
@@ -608,6 +811,104 @@ namespace call_func_proc
 	BOOL init()
 	{
 		return hook::attach(orig_proc, hook_proc, 0x49370);
+	}
+
+	//
+	// 後始末処理です。
+	// フックを解除します。
+	//
+	BOOL exit()
+	{
+		return hook::detach(orig_proc, hook_proc);
+	}
+}
+
+//
+// 拡張編集フィルタに値をセットする関数をフックします。
+//
+namespace set_filter_variables
+{
+	//
+	// この関数は拡張編集フィルタに値をセットします。
+	//
+	void (CDECL* orig_proc)(ExEdit::Object* object, int32_t filter_index, int32_t* track, uint32_t u4, uint32_t u5, ExEdit::FilterProcInfo* efpip) = nullptr;
+	void CDECL hook_proc(ExEdit::Object* object, int32_t filter_index, int32_t* track, uint32_t u4, uint32_t u5, ExEdit::FilterProcInfo* efpip)
+	{
+		// まず、デフォルト処理でフィルタに値をセットします。
+		orig_proc(object, filter_index, track, u4, u5, efpip);
+
+		// フィルタを取得できた場合は
+		if (auto filter = exin.get_filter(object, filter_index))
+		{
+			// 継承先を監視している場合は
+			if (is_valid(filter->processing) && is_valid(heir::fake))
+			{
+				// オブジェクトフィルタインデックスがフェイクになっている場合は
+				if (filter->processing == heir::fake)
+				{
+					// 元のオブジェクトフィルタインデックスに戻します。
+					filter->processing = heir::processing;
+				}
+			}
+		}
+	}
+
+	//
+	// 初期化処理です。
+	// フックをセットします。
+	//
+	BOOL init()
+	{
+		return hook::attach(orig_proc, hook_proc, 0x47E30);
+	}
+
+	//
+	// 後始末処理です。
+	// フックを解除します。
+	//
+	BOOL exit()
+	{
+		return hook::detach(orig_proc, hook_proc);
+	}
+}
+
+//
+// ビジュアルを追加する関数をフックします。
+//
+namespace add_visual
+{
+	//
+	// この関数はビジュアルを追加します。
+	//
+	void (CDECL* orig_proc)(ExEdit::ObjectFilterIndex object_filter_index,
+		int32_t x, int32_t y, int32_t w, int32_t h,
+		int16_t u6, int16_t u7, int16_t u8, int16_t u9, uint32_t flags, uint32_t id) = nullptr;
+	void CDECL hook_proc(ExEdit::ObjectFilterIndex object_filter_index,
+		int32_t x, int32_t y, int32_t w, int32_t h,
+		int16_t u6, int16_t u7, int16_t u8, int16_t u9, uint32_t flags, uint32_t id)
+	{
+		// 継承先を監視している場合は
+		if (is_valid(object_filter_index) && is_valid(heir::fake))
+		{
+			// オブジェクトフィルタインデックスがフェイクになっている場合は
+			if (object_filter_index == heir::fake)
+			{
+				// 元のオブジェクトフィルタインデックスに戻します。
+				object_filter_index = heir::processing;
+			}
+		}
+
+		// デフォルト処理を実行します。
+		orig_proc(object_filter_index, x, y, w, h, u6, u7, u8, u9, flags, id);
+	}
+
+	//
+	// 初期化処理です。
+	// フックをセットします。
+	//
+	BOOL init()
+	{
+		return hook::attach(orig_proc, hook_proc, 0x4BD60);
 	}
 
 	//
@@ -710,6 +1011,8 @@ inline struct {
 			exin.init();
 //			call_func_update::init();
 			call_func_proc::init();
+			set_filter_variables::init();
+			add_visual::init();
 
 			return TRUE;
 		}
